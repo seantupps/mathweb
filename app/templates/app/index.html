@@ -1,0 +1,274 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Mental Math</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <style>
+
+
+        html, body {
+            overflow: hidden;
+        }
+
+        body {
+            transform: scale(1.1);
+            transform-origin: 80%;
+        }
+        
+        #problemContainer {
+            will-change: opacity, transform;
+            transition: opacity 0.5s;
+            height: 350px;
+        }
+
+        .invisible-input {
+            background: transparent;
+            border: none;
+            outline: none;
+            text-align: right;
+            color: #a8a8a8;
+            caret-color: transparent;
+        }
+
+        .invisible-input::placeholder {
+            color: #a9a9a9;
+        }
+
+        input::-webkit-inner-spin-button,
+        input::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type="number"] {
+            -moz-appearance: textfield;
+            appearance: textfield;
+        }
+    </style>
+</head>
+
+<body style="background-color: #141414;" class="flex items-center justify-center min-h-screen text-white">
+    <!-- div id="timerDisplay" class="text-5xl text-center absolute top-4 left-0 w-full"></div-->
+    {% csrf_token %}
+    <!-- Outer container remains centered -->
+    <div class="w-96 mx-auto absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2">
+        <!-- Wrapper that allows custom horizontal offset -->
+        <div id="problemContainer" class="relative">
+            <table class="mx-auto">
+                <!-- First row: First number -->
+                <tr>
+                    <td class="w-6"></td>
+                    <td id="num1Td" class="text-right text-8xl text-white">{{ num1 }}</td>
+                </tr>
+                <!-- Second row: Plus sign and second number -->
+                <tr>
+                    <td class="w-12"></td>
+                    <td id="num2Td" class="text-8xl text-white" style="text-align: left; display: flex; align-items: center; justify-content: flex-end;">
+                        <span style="display:inline-block; vertical-align: middle; line-height: 1; margin-right: 0.2em;">
+                            <span id="operationSymbol">{{ operation }}</span>
+                        </span>
+                        <span id="num2Span" style="display:inline-block; vertical-align: middle; line-height: 1;">{{ num2 }}</span>
+                    </td>
+                </tr>
+                <!-- Horizontal line separator -->
+                <tr>
+                    <td></td>
+                    <td class="pt-2 text-right">
+                        <hr id="numberBar" class="border-t-2 border-white inline-block">
+                    </td>
+                </tr>
+                <!-- Answer input aligned with the numbers -->
+                <tr>
+                    <td></td>
+                    <td class="text-right">
+                        <!-- A placeholder "?" shows when there’s no input -->
+                        <input id="answerInput" type="number" class="invisible-input text-8xl text-white" autofocus
+                            style="width: 300%; margin-left: -1000px; box-sizing: border-box;" placeholder="?">
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+    <script>
+        let startTime;
+        let timerInterval;
+
+        function startTimer() {
+            startTime = Date.now();
+            timerInterval = setInterval(updateTimer, 10); // Update every 10ms for smoother display
+        }
+
+        function updateTimer() {
+            const currentTime = Date.now();
+            const elapsedTime = currentTime - startTime;
+            const formattedTime = formatTime(elapsedTime);
+            document.getElementById('timerDisplay').textContent = formattedTime;
+        }
+
+        function formatTime(ms) {
+            let minutes = Math.floor((ms / (1000 * 60)) % 60);
+            let seconds = Math.floor((ms / 1000) % 60);
+            let milliseconds = ms % 1000;
+
+            minutes = (minutes < 10) ? "0" + minutes : minutes;
+            seconds = (seconds < 10) ? "0" + seconds : seconds;
+            milliseconds = (milliseconds < 100) ? (milliseconds < 10 ? "00" + milliseconds : "0" + milliseconds) : milliseconds;
+
+            return minutes + ":" + seconds + ":" + milliseconds;
+        }
+
+        function stopTimer() {
+            clearInterval(timerInterval);
+            const endTime = Date.now();
+            const elapsedTime = endTime - startTime;
+            return elapsedTime;
+        }
+
+        // Start the timer when the page loads or when a new question is displayed
+        startTimer();
+
+        // Function to get the CSRF token from cookies.
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let cookie of cookies) {
+                    cookie = cookie.trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        const inputField = document.getElementById('answerInput');
+        inputField.addEventListener('blur', () => {
+            inputField.focus();
+
+        });
+
+        const num1Td = document.getElementById('num1Td');
+        const num2Span = document.getElementById('num2Span');
+        const problemContainer = document.getElementById('problemContainer');
+        const numberBar = document.getElementById('numberBar');
+
+        // Get the number of questions from localStorage
+        let numQuestions = localStorage.getItem('numQuestions');
+        let questionsAnswered = 0;
+
+        function adjustProblem(problemSize) {
+            // problemContainer.style.left = '0';
+            // problemContainer.style.transform = 'none';
+            
+            // Dynamically set hr width based on the width of the second number.
+            const num2Width = num2Span.offsetWidth;
+            numberBar.style.width = `${num2Width + 74}px`;
+            numberBar.style.marginLeft = '-30px'; // Shift to the left as before
+        }
+
+        // Determine initial problem size and adjust
+        let initialNum1 = num1Td.textContent;
+        let initialNum2 = num2Span.textContent;
+        let initialProblemSize = Math.max(String(initialNum1).length, String(initialNum2).length);
+        initialProblemSize = Math.min(initialProblemSize, 7);
+        adjustProblem(initialProblemSize);
+
+        // Get the operation from the template context
+        const operation = "{{ operation }}";
+
+        // Set the correct operator symbol
+        let operationSymbol = '+';
+        if (operation === 'sub') {
+            operationSymbol = '−';
+        } else if (operation === 'mul') {
+            operationSymbol = '×';
+        } else if (operation === 'div') {
+            operationSymbol = '÷';
+        }
+
+        // Set the operator symbol in the template
+        const operationSymbolSpan = document.getElementById('operationSymbol');
+        operationSymbolSpan.textContent = operationSymbol;
+
+        // Modify the fetch URL to include the operation
+        const fetchUrl = "{% url 'check_answer' %}?operation=" + operation;
+
+        inputField.addEventListener('input', function () {
+            if (this.value.length > 12) {
+                this.value = this.value.slice(0, 12);
+            }
+            const answer = this.value.trim();
+            const currentNum1 = parseInt(num1Td.textContent.trim(), 10);
+            const currentNum2 = parseInt(num2Span.textContent.trim(), 10);
+
+            let correct = 0;
+            if (operation === 'sub') {
+                correct = currentNum1 - currentNum2;
+            } else if (operation === 'mul') {
+                correct = currentNum1 * currentNum2;
+            } else if (operation === 'div') {
+                correct = currentNum1 / currentNum2;
+            } else {
+                correct = currentNum1 + currentNum2;
+            }
+
+            if (answer !== "" && parseInt(answer, 10) === correct) {
+                const timeTaken = stopTimer(); // Stop the timer and get the elapsed time
+                inputField.style.color = '#44ba28';
+                inputField.disabled = true; // Disable the input field
+                problemContainer.style.transition = 'opacity 0.5s';
+                problemContainer.style.opacity = '0';
+
+                fetch(fetchUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': csrftoken
+                    },
+                    body: new URLSearchParams({
+                        'answer': answer,
+                        'num1': currentNum1,
+                        'num2': currentNum2,
+                        'timeTaken': timeTaken // Send the time taken to the server
+                    })
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.correct) {
+                            questionsAnswered++;
+                            // Check if the question limit has been reached
+                            if (questionsAnswered >= numQuestions) {
+                                // Redirect to the selection page
+                                window.location.href = "{% url 'selection' %}";
+                                return;
+                            }
+                            setTimeout(() => {
+                                num1Td.textContent = data.num1;
+                                num2Span.textContent = data.num2;
+                                inputField.value = '';
+                                inputField.style.color = 'darkgray';
+                                problemContainer.style.opacity = '1';
+                                inputField.disabled = false;
+                                inputField.focus();
+
+                                let problemSize = Math.max(String(data.num1).length, String(data.num2).length);
+                                problemSize = Math.min(problemSize, 7);
+
+                                adjustProblem(problemSize);
+                                startTimer(); // Start the timer for the new question
+                            }, 500);
+                        }
+                    });
+            }
+        });
+    </script>
+</body>
+
+</html>

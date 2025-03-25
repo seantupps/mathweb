@@ -1,0 +1,17 @@
+{
+  "name": "mathweb",
+  "version": "1.0.0",
+  "description": "This project is a Django web application focused on enhancing mental math skills through interactive exercises and challenges. It utilizes Tailwind CSS for styling and Alpine.js for interactivity, providing a modern and responsive user experience.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.5.1",
+    "tailwindcss": "^3.4.17"
+  }
+}
