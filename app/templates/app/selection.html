@@ -359,7 +359,7 @@
                     const qVal = alpineData.questionsMap[Math.round(alpineData.questions)];
                     updateLeaderboard(alpineData.selectedOp, digitsRounded, qVal);
                 }
-            });
+            }, 50);
         }
 
         // Scroll functionality for leaderboard
@@ -521,8 +521,8 @@
                             this.updateThumbLabel('questions');
                             // Load initial leaderboard
                             this.updateLeaderboardForCurrentSettings();
-                        }, 0);
-                    }, 100);
+                        });
+                    });
                 },
 
                 start() {
