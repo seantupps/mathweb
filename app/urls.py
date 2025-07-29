@@ -9,4 +9,5 @@ urlpatterns = [
     path('division/<int:problem>/', views.division, name='division_problems'),
     path('check_answer/', views.check_answer, name='check_answer'),
     path('store_selected_op/', views.store_selected_op, name='store_selected_op'),
+    path('get_leaderboard/', views.get_leaderboard, name='get_leaderboard'),
 ]  

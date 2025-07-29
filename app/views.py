@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.http import JsonResponse
+from .models import LeaderboardEntry
 import random
 
 def selection(request):
@@ -21,7 +22,58 @@ def selection(request):
     current_mapping = operation_mapping.get(selected_op, operation_mapping['add'])
     mode = current_mapping.get(num_digits, "1+1")
 
-    return render(request, 'app/selection.html', {'last_problems': last_problems, 'mode': mode, 'average_time': average_time, 'num_questions': num_questions})
+    # Get leaderboard for current settings (will be empty initially)
+    try:
+        leaderboard = LeaderboardEntry.objects.filter(
+            operation=selected_op,
+            digits=num_digits,
+            num_questions=num_questions
+        ).order_by('average_time')[:10]
+    except:
+        leaderboard = []
+
+    return render(request, 'app/selection.html', {
+        'last_problems': last_problems, 
+        'mode': mode, 
+        'average_time': average_time, 
+        'num_questions': num_questions,
+        'leaderboard': leaderboard
+    })
+
+def get_leaderboard(request):
+    """AJAX endpoint to get leaderboard data for specific settings"""
+    if request.method == 'GET':
+        operation = request.GET.get('operation', 'add')
+        digits = int(request.GET.get('digits', 1))
+        num_questions = int(request.GET.get('num_questions', 3))
+        
+        try:
+            leaderboard = LeaderboardEntry.objects.filter(
+                operation=operation,
+                digits=digits,
+                num_questions=num_questions
+            ).order_by('average_time')[:10]
+            
+            # Convert to list of dictionaries for JSON response
+            leaderboard_data = [
+                {
+                    'rank': idx + 1,
+                    'average_time': entry.average_time
+                }
+                for idx, entry in enumerate(leaderboard)
+            ]
+            
+            return JsonResponse({
+                'success': True,
+                'leaderboard': leaderboard_data
+            })
+        except Exception as e:
+            return JsonResponse({
+                'success': False,
+                'error': str(e)
+            })
+    
+    return JsonResponse({'success': False, 'error': 'Invalid request method'})
 
 def store_selected_op(request):
     if request.method == 'POST':
@@ -113,10 +165,6 @@ def multiplication(request, problem):
 def division(request, problem):
     return start_game(request, 'div', problem)
 
-from django.shortcuts import render
-from django.http import JsonResponse
-import random
-
 def check_answer(request):
     if request.method != "POST":
         return JsonResponse({'correct': False})
@@ -170,12 +218,33 @@ def check_answer(request):
     request.session['last_problems'] = last_problems
     # -------------------------------------------------------
 
-    # Check if a set of problems is complete (based on Q setting) and reset canonical set if so.
+    # Check if a set of problems is complete (based on Q setting) and save to leaderboard
     num_questions = int(request.session.get('num_questions', 3))
+    set_completed = False
+    
     if len(last_problems) >= num_questions:
-        print("Resetting last_problems_set after a complete set of problems.")
+        print("Set completed! Calculating average and saving to leaderboard.")
+        
+        # Calculate average time for this completed set
+        total_time = sum(time for problem, time in last_problems[:num_questions])
+        average_time = total_time / num_questions
+        
+        # Save to leaderboard
+        try:
+            LeaderboardEntry.objects.create(
+                operation=operation,
+                digits=num_digits,
+                num_questions=num_questions,
+                average_time=average_time
+            )
+            print(f"Saved to leaderboard: {operation} {num_digits}D {num_questions}Q - {average_time:.3f}s")
+        except Exception as e:
+            print(f"Error saving to leaderboard: {e}")
+        
+        # Reset the canonical set after completing a set
         last_problems_set = set()
         request.session['last_problems_set'] = []
+        set_completed = True
 
     MAX_ATTEMPTS = 1000
     attempts = 0
@@ -253,5 +322,6 @@ def check_answer(request):
         'correct': True,
         'num1': new_num1,
         'num2': new_num2,
-        'operation': operation
+        'operation': operation,
+        'set_completed': set_completed  # Let frontend know if a set was completed
     })
